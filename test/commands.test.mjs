@@ -263,3 +263,22 @@ test("a hand-edited duplicate stays only in its first schedule", () => {
   const store = new Store(t.dir);
   assert.deepEqual(store.config.schedules, { "15m": ["a@g.us", "b@g.us"], "30m": ["c@g.us"] });
 });
+
+test(".status shows each group's g-code from the .grup list; .del accepts it", async () => {
+  const t = setup();
+  await t.say(".add 10m g2 g1 08111111111");
+  const status = await t.say(".status");
+  assert.match(status, /1\. \*g2\* · Komunitas B/);
+  assert.match(status, /2\. \*g1\* · Alumni A/);
+  assert.match(status, /3\. \+62 811-1111-111/);
+  assert.match(status, /\.del 10m g3/);
+
+  // a group the number left keeps its place but is marked
+  t.wa.groupsList = t.wa.groupsList.filter((g) => g.name !== "Komunitas B");
+  await t.say(".fetchgrup");
+  assert.match(await t.say(".status"), /1\. 120363000000000002@g\.us _\(bukan anggota lagi\)_|1\. Komunitas B _\(bukan anggota lagi\)_/);
+
+  assert.match(await t.say(".del 10m g1"), /\*g1\* · Alumni A/);
+  assert.deepEqual(t.store.config.schedules["10m"], ["120363000000000002@g.us", "628111111111@s.whatsapp.net"]);
+  t.scheduler.stop();
+});

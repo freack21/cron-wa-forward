@@ -145,17 +145,15 @@ export class Commands {
     }).format(ms);
   }
 
+  /** "g3 · Nama Grup" for groups (the code of the last .grup list), "+62 812-…" for numbers. */
   private async nameOf(jid: string) {
     if (!jid.endsWith("@g.us")) return prettyJid(jid);
-    if (Date.now() - this.groupNamesAt > 10 * 60_000) {
-      try {
-        for (const g of await this.wa.groups()) this.groupNames.set(g.id, g.name);
-        this.groupNamesAt = Date.now();
-      } catch {
-        // names are cosmetic
-      }
+    if (!this.groupList.length || Date.now() - this.groupNamesAt > 10 * 60_000) {
+      await this.loadGroups().catch(() => undefined); // names are cosmetic
     }
-    return this.groupNames.get(jid) ?? jid;
+    const index = this.groupList.findIndex((g) => g.id === jid);
+    const name = this.groupNames.get(jid) ?? jid;
+    return index >= 0 ? `*g${index + 1}* · ${name}` : `${name} _(bukan anggota lagi)_`;
   }
 
   private schedulesText(names?: Map<string, string>) {
@@ -187,7 +185,12 @@ export class Commands {
       `🐢 Jeda antar chat: ${this.delayText()} (ubah: *.delay 5-15*)`,
       "",
       this.schedulesText(names),
-    ].join("\n");
+      Object.values(this.store.config.schedules).some((l) => l.some((j) => j.endsWith("@g.us")))
+        ? "\nKode *g* sama dengan daftar *.grup*; pakai juga untuk hapus, contoh: *.del 10m g3*"
+        : "",
+    ]
+      .join("\n")
+      .trimEnd();
   }
 
   private async set(quoted?: Incoming["quoted"]) {
