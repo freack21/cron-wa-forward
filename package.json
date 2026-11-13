@@ -1,0 +1,28 @@
+{
+  "name": "cron-wa-forward",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WhatsApp bot that forwards a channel post to chats on a schedule, configured from the bot's own chat",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": "20.x || 22.x || 24.x"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test \"test/*.test.mjs\"",
+    "check:whatsauto": "node scripts/check-whatsauto.mjs"
+  },
+  "author": "freack21",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "whatsauto.js": "^2.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
