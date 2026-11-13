@@ -237,3 +237,29 @@ test("a channel post without a name gets it from the channel's metadata", async 
   assert.match(await t.say(".set"), /Saluran Dari Metadata/);
   assert.equal(t.store.state.message.channel.name, "Saluran Dari Metadata");
 });
+
+test("a chat lives in one schedule: adding it elsewhere moves it", async () => {
+  const t = setup();
+  await t.say(".add 15m 08111111111, 08222222222");
+  const reply = await t.say(".add 30m 08111111111, 08333333333");
+  assert.match(reply, /ditambah 2 chat \(1 dipindah\)/);
+  assert.match(reply, /\+62 811-1111-111 \(pindah dari 15m, di sana dihapus\)/);
+  assert.deepEqual(t.store.config.schedules["15m"], ["628222222222@s.whatsapp.net"]);
+  assert.deepEqual(t.store.config.schedules["30m"], ["628111111111@s.whatsapp.net", "628333333333@s.whatsapp.net"]);
+
+  assert.match(await t.say(".add 1 jam 08222222222"), /1 chat dipindah ke sini/);
+  assert.deepEqual(t.store.config.schedules["15m"], []);
+  assert.match(await t.say(".add 1h 08222222222"), /sudah ada di jadwal 1h/);
+
+  const saved = JSON.parse(fs.readFileSync(path.join(t.dir, "config.json"), "utf-8"));
+  const all = [saved["15m"], saved["30m"], saved["1h"]].flat();
+  assert.equal(new Set(all).size, all.length, "no chat in two schedules");
+  t.scheduler.stop();
+});
+
+test("a hand-edited duplicate stays only in its first schedule", () => {
+  const t = setup();
+  fs.writeFileSync(path.join(t.dir, "config.json"), JSON.stringify({ msg: "", "15m": ["a@g.us", "b@g.us"], "30m": ["a@g.us", "c@g.us"] }));
+  const store = new Store(t.dir);
+  assert.deepEqual(store.config.schedules, { "15m": ["a@g.us", "b@g.us"], "30m": ["c@g.us"] });
+});

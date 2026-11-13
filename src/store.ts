@@ -67,6 +67,11 @@ export class Store {
         if (!canonical || !Array.isArray(value)) continue; // unknown keys are ignored, not fatal
         schedules[canonical] = [...new Set([...(schedules[canonical] ?? []), ...value.map(String)])];
       }
+      // a chat belongs to one schedule: a hand-edited duplicate stays only in its first schedule
+      const seen = new Set<string>();
+      for (const key of Object.keys(schedules)) {
+        schedules[key] = schedules[key].filter((jid) => !seen.has(jid) && !!seen.add(jid));
+      }
       this.config = { msg: typeof raw.msg === "string" ? raw.msg : "", schedules };
     }
     if (fs.existsSync(this.stateFile)) {
@@ -87,11 +92,20 @@ export class Store {
     return Object.keys(this.config.schedules).sort((a, b) => minutes(a) - minutes(b));
   }
 
-  /** Add chats to a schedule; returns the ones that were new. */
+  /**
+   * Add chats to a schedule. A chat belongs to one schedule only: a chat that is in another
+   * schedule moves here (it is removed there). Returns the new chats, with where they came from.
+   */
   add(key: string, jids: string[]) {
     const list = (this.config.schedules[key] ??= []);
-    const added = jids.filter((j) => !list.includes(j));
-    list.push(...added);
+    const added: { jid: string; from?: string }[] = [];
+    for (const jid of jids) {
+      if (list.includes(jid)) continue;
+      const from = Object.keys(this.config.schedules).find((k) => k !== key && this.config.schedules[k].includes(jid));
+      if (from) this.config.schedules[from] = this.config.schedules[from].filter((j) => j !== jid);
+      list.push(jid);
+      added.push({ jid, from });
+    }
     this.save();
     return added;
   }

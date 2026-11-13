@@ -118,7 +118,7 @@ export class Commands {
       "Teruskan postingan saluranmu ke chat ini, lalu ketik *.set* (atau balas pesan apa pun dengan *.set*).",
       "",
       "*2. Atur jadwal & tujuan*",
-      "*.add 15m 08123456789, g2* — kirim tiap 15 menit ke nomor & grup",
+      "*.add 15m 08123456789, g2* — kirim tiap 15 menit ke nomor & grup (satu chat hanya di satu jadwal: kalau sudah ada di jadwal lain, dipindah ke sini)",
       "*.grup* — daftar grup (pakai g1, g2, ... di .add). *.grup kata* untuk mencari",
       "*.fetchgrup* — ambil ulang semua grup nomor ini dari WhatsApp (lengkap dengan ID)",
       "*.del 15m 2* — hapus chat nomor 2 dari jadwal 15m (lihat .status)",
@@ -275,11 +275,16 @@ export class Commands {
     if (!jids.length) return `❌ Tidak ada tujuan yang dikenali:\n${errors.map((e) => `• ${e}`).join("\n")}`;
     const added = this.store.add(key, jids);
     this.scheduler.refresh();
-    const names = await Promise.all(added.map((j) => this.nameOf(j)));
+    const lines = await Promise.all(
+      added.map(async (a) => `• ${await this.nameOf(a.jid)}${a.from ? ` (pindah dari ${a.from}, di sana dihapus)` : ""}`)
+    );
+    const moved = added.filter((a) => a.from).length;
     const total = this.store.config.schedules[key].length;
     const next = this.scheduler.nextRunOf(key);
     return [
-      added.length ? `✅ Tiap *${describe(key)}*: ditambah ${added.length} chat\n${names.map((n) => `• ${n}`).join("\n")}` : `Semua tujuan itu sudah ada di jadwal ${key}.`,
+      added.length
+        ? `✅ Tiap *${describe(key)}*: ${moved === added.length ? `${moved} chat dipindah ke sini` : `ditambah ${added.length} chat${moved ? ` (${moved} dipindah)` : ""}`}\n${lines.join("\n")}`
+        : `Semua tujuan itu sudah ada di jadwal ${key}.`,
       jids.length > added.length && added.length ? `(${jids.length - added.length} sudah ada sebelumnya)` : "",
       errors.length ? `⚠️ Dilewati:\n${errors.map((e) => `• ${e}`).join("\n")}` : "",
       `Total ${total} chat${next ? `, kirim berikutnya ${this.fmtTime(next)}` : ""}.`,

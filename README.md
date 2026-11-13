@@ -31,6 +31,7 @@ Or set `PAIRING_PHONE` in `.env` to log in with a pairing code. Run it with pm2 
    .grup                          list groups: g1, g2, ...
    .fetchgrup                     fetch every group of this number from WhatsApp again (with ids)
    .add 15m 08123456789, g2       every 15 minutes to a number and a group
+                                  (a chat is in one schedule only: adding it to 30m moves it out of 15m)
    .add 1 jam g1 g3 https://chat.whatsapp.com/XXXX
    .del 15m 2                     remove chat #2 of the 15m schedule (numbers from .status)
    .del 15m semua                 remove the whole schedule
