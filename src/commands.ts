@@ -32,6 +32,11 @@ export class Commands {
   private groupNamesAt = 0;
   /** The last channel post forwarded into the command chat (used by `.set` without a reply). */
   private lastChannelPost?: { id: string; content: proto.IMessage };
+  /**
+   * Channel posts seen in the command chat, by message id. A reply only carries a trimmed copy of
+   * the message it quotes (without the channel details), so `.set` as a reply uses this full copy.
+   */
+  private recentPosts = new Map<string, proto.IMessage>();
 
   constructor(
     private store: Store,
@@ -47,6 +52,8 @@ export class Commands {
       // a channel post forwarded into this chat: offer it
       if (msg.content && msg.id && channelOf(unwrap(msg.content))) {
         this.lastChannelPost = { id: msg.id, content: msg.content };
+        this.recentPosts.set(msg.id, msg.content);
+        if (this.recentPosts.size > 50) this.recentPosts.delete(this.recentPosts.keys().next().value!);
         return `📌 Postingan saluran diterima: _${previewOf(unwrap(msg.content))}_\nKetik *.set* untuk menjadikannya pesan yang diteruskan.`;
       }
       return undefined;
@@ -76,6 +83,11 @@ export class Commands {
       case "group":
       case "groups":
         return this.groups(args);
+      case "fetchgrup":
+      case "ambilgrup":
+      case "refreshgrup":
+      case "fetchgroups":
+        return this.groups(args, true);
       case "kirim":
       case "test":
       case "send":
@@ -108,6 +120,7 @@ export class Commands {
       "*2. Atur jadwal & tujuan*",
       "*.add 15m 08123456789, g2* — kirim tiap 15 menit ke nomor & grup",
       "*.grup* — daftar grup (pakai g1, g2, ... di .add). *.grup kata* untuk mencari",
+      "*.fetchgrup* — ambil ulang semua grup nomor ini dari WhatsApp (lengkap dengan ID)",
       "*.del 15m 2* — hapus chat nomor 2 dari jadwal 15m (lihat .status)",
       "*.del 15m semua* — hapus jadwal 15m",
       "",
@@ -178,12 +191,14 @@ export class Commands {
   }
 
   private async set(quoted?: Incoming["quoted"]) {
-    const source = quoted ?? this.lastChannelPost;
+    const full = quoted && this.recentPosts.get(quoted.id);
+    const source = quoted ? { id: quoted.id, content: full ?? quoted.content } : this.lastChannelPost;
     if (!source) {
       return "Balas (reply) pesan yang mau diteruskan dengan *.set*, atau teruskan dulu postingan saluranmu ke chat ini lalu ketik *.set*.";
     }
     const content = unwrap(source.content);
     const channel = channelOf(content);
+    if (channel && !channel.name) channel.name = await this.wa.channelName(channel.jid).catch(() => undefined);
     const type = mediaTypeOf(content);
     let mediaFile: string | undefined;
     if (type) {
@@ -207,7 +222,7 @@ export class Commands {
     this.lastChannelPost = undefined;
     return [
       `✅ Pesan diatur: _${previewOf(content)}_`,
-      channel ? `Penerima melihatnya sebagai diteruskan dari saluran *${channel.name ?? channel.jid}*.` : "ℹ️ Ini bukan postingan saluran; dikirim sebagai pesan diteruskan biasa.",
+      channel ? `Penerima melihatnya sebagai diteruskan dari saluran *${channel.name ?? channel.jid}*.` : "ℹ️ Detail saluran tidak ditemukan, jadi dikirim sebagai pesan diteruskan biasa. Kalau ini postingan saluran, teruskan ulang postingannya ke chat ini lalu ketik *.set* (tanpa reply).",
       this.store.sortedKeys().length ? "" : "\nLanjut atur jadwal, contoh: *.add 15m 08123456789, g1*",
     ]
       .filter(Boolean)
@@ -338,23 +353,24 @@ export class Commands {
     return `✅ Jeda antar chat: ${this.delayText()}. Pesan dikirim satu per satu.${longest}`;
   }
 
-  private async loadGroups() {
-    const groups = await this.wa.groups();
+  private async loadGroups(refresh = false) {
+    const groups = await this.wa.groups({ refresh });
     this.groupList = groups.sort((a, b) => a.name.localeCompare(b.name, "id"));
     for (const g of groups) this.groupNames.set(g.id, g.name);
     this.groupNamesAt = Date.now();
   }
 
-  private async groups(filter: string) {
-    await this.loadGroups();
-    if (!this.groupList.length) return "Bot belum masuk grup mana pun.";
+  private async groups(filter: string, refresh = false) {
+    await this.loadGroups(refresh);
+    if (!this.groupList.length) return "Nomor ini belum masuk grup mana pun.";
     const needle = filter.toLowerCase();
     const rows = this.groupList
       .map((g, i) => ({ g, i }))
       .filter(({ g }) => !needle || g.name.toLowerCase().includes(needle))
-      .map(({ g, i }) => `g${i + 1}. ${g.name} (${g.size} anggota)`);
+      .map(({ g, i }) => `g${i + 1}. ${g.name} (${g.size} anggota)${refresh ? `\n      ${g.id}` : ""}`);
     if (!rows.length) return `Tidak ada grup yang namanya memuat "${filter}".`;
-    return `*👥 Grup* (${rows.length})\n${rows.join("\n")}\n\nPakai kodenya, contoh: *.add 15m g1 g3*`;
+    const title = refresh ? `*👥 Semua grup nomor ini* (${rows.length}, baru diambil dari WhatsApp)` : `*👥 Grup* (${rows.length})`;
+    return `${title}\n${rows.join("\n")}\n\nPakai kodenya, contoh: *.add 15m g1 g3*${refresh ? "" : "\nGrup baru belum muncul? *.fetchgrup*"}`;
   }
 
   private async sendNow(args: string) {

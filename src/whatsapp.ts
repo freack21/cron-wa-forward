@@ -64,8 +64,17 @@ export function createWa(client: AutoWA, ownMessageIds: Set<string>): Wa {
       return fresh;
     },
 
-    async groups() {
-      return (await client.getGroups()).map((g) => ({ id: g.id, name: g.subject || g.id, size: g.participants?.length ?? 0 }));
+    async groups(opts) {
+      return (await client.getGroups({ refresh: !!opts?.refresh })).map((g) => ({ id: g.id, name: g.subject || g.id, size: g.participants?.length ?? 0 }));
+    },
+
+    async channelName(jid) {
+      try {
+        const meta: any = await sock().newsletterMetadata("jid", jid);
+        return meta?.thread_metadata?.name?.text ?? meta?.name ?? undefined;
+      } catch {
+        return undefined;
+      }
     },
 
     async groupOfInvite(code) {

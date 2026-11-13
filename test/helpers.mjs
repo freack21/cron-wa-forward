@@ -33,8 +33,13 @@ export class FakeWa {
     this.uploads.push({ type, media: media.toString() });
     return { url: "https://new", mediaKey: Buffer.from("newkey"), directPath: "/new" };
   }
-  async groups() {
+  groupCalls = [];
+  async groups(opts = {}) {
+    this.groupCalls.push(!!opts.refresh);
     return this.groupsList.map((g) => ({ ...g }));
+  }
+  async channelName(jid) {
+    return jid === "120363888888888888@newsletter" ? "Saluran Dari Metadata" : undefined;
   }
   async groupOfInvite(code) {
     if (code === "AbCdEfGhIjKl") return { id: "120363000000000009@g.us", name: "Dari Link" };

@@ -29,6 +29,9 @@ export interface ChannelInfo {
   jid: string;
   serverMessageId: number;
   name?: string;
+  /** Extra forward fields of the original (content type, accessibility text), kept as they were. */
+  contentType?: number;
+  accessibilityText?: string;
 }
 
 /** The channel a forwarded post came from, if it is one. */
@@ -36,7 +39,13 @@ export function channelOf(content: proto.IMessage): ChannelInfo | undefined {
   const type = mainType(content);
   const info = type ? (content as any)[type]?.contextInfo?.forwardedNewsletterMessageInfo : undefined;
   if (!info?.newsletterJid) return undefined;
-  return { jid: info.newsletterJid, serverMessageId: Number(info.serverMessageId ?? 0), name: info.newsletterName ?? undefined };
+  return {
+    jid: info.newsletterJid,
+    serverMessageId: Number(info.serverMessageId ?? 0),
+    name: info.newsletterName ?? undefined,
+    contentType: info.contentType ?? undefined,
+    accessibilityText: info.accessibilityText ?? undefined,
+  };
 }
 
 /** Short text shown in `.status`. */
@@ -56,9 +65,10 @@ export function previewOf(content: proto.IMessage): string {
 }
 
 /**
- * The content to send: a clean copy marked as forwarded, still pointing at the channel
- * ("Diteruskan dari <saluran>" on the recipient's side), without quotes or mentions of the
- * original chat.
+ * The content to send, the way WhatsApp itself forwards a channel post: marked as forwarded
+ * from the channel (`forwardOrigin: CHANNELS` and the channel's jid, post id and name), so the
+ * recipient sees "Diteruskan dari <saluran>" with the channel's name and a link to it. Quotes and
+ * mentions of the chat it was copied from are dropped.
  */
 export function forwardContent(content: proto.IMessage, channel?: ChannelInfo): proto.IMessage {
   const copy = proto.Message.decode(proto.Message.encode(unwrap(content)).finish());
@@ -69,15 +79,19 @@ export function forwardContent(content: proto.IMessage, channel?: ChannelInfo): 
   delete (copy as any).messageContextInfo;
   const type = mainType(copy);
   if (!type) throw new Error("message has no content");
+  const original = (copy as any)[type].contextInfo ?? {};
   (copy as any)[type].contextInfo = {
     isForwarded: true,
-    forwardingScore: 1,
+    forwardingScore: Math.max(Number(original.forwardingScore ?? 0), 1),
     ...(channel
       ? {
+          forwardOrigin: proto.ContextInfo.ForwardOrigin.CHANNELS,
           forwardedNewsletterMessageInfo: {
             newsletterJid: channel.jid,
             serverMessageId: channel.serverMessageId,
             newsletterName: channel.name,
+            contentType: channel.contentType ?? proto.ContextInfo.ForwardedNewsletterMessageInfo.ContentType.UPDATE,
+            ...(channel.accessibilityText ? { accessibilityText: channel.accessibilityText } : {}),
           },
         }
       : {}),

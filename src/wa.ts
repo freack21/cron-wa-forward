@@ -12,7 +12,10 @@ export interface Wa {
   download(content: proto.IMessage): Promise<Buffer>;
   /** Upload media again; returns the new media fields (url, mediaKey, directPath, ...). */
   upload(type: string, media: Buffer, old: Record<string, any>): Promise<Record<string, any>>;
-  groups(): Promise<{ id: string; name: string; size: number }[]>;
+  /** Groups of the bot's number; `refresh` asks WhatsApp instead of the cache. */
+  groups(opts?: { refresh?: boolean }): Promise<{ id: string; name: string; size: number }[]>;
+  /** A channel's name (best effort). */
+  channelName(jid: string): Promise<string | undefined>;
   /** The group of an invite link (the bot must already be a member to send there). */
   groupOfInvite(code: string): Promise<{ id: string; name: string }>;
 }

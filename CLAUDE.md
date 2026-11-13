@@ -7,7 +7,7 @@ commands in "Message yourself" (the bot's own chat). TypeScript ESM on
 ## Layout
 
 - `src/index.ts` — boot: whatsauto.js client, command chat detection, signals
-- `src/commands.ts` — `.menu .status .set .add .del .grup .kirim .jeda .lanjut` (Indonesian replies)
+- `src/commands.ts` — `.menu .status .set .add .del .grup .fetchgrup .kirim .delay .jeda .lanjut` (Indonesian replies)
 - `src/scheduler.ts` — one timer per schedule on a local clock grid, serialized runs, media refresh, failure reports
 - `src/store.ts` — `data/config.json` (`{"msg": ..., "15m": [jids], ...}`, hand-editable) and `data/state.json`
 - `src/duration.ts` (interval keys), `src/targets.ts` (numbers, `g<n>`, invite links), `src/message.ts` (forward content)

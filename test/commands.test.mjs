@@ -31,7 +31,7 @@ test(".set as a reply to any message; media is kept locally", async () => {
   const content = { imageMessage: { caption: "Poster", mimetype: "image/jpeg", url: "https://old" } };
   const reply = await t.say(".set", { quoted: { id: "Q1", content } });
   assert.match(reply, /\[image\] Poster/);
-  assert.match(reply, /bukan postingan saluran/);
+  assert.match(reply, /Detail saluran tidak ditemukan/);
   const m = t.store.state.message;
   assert.equal(fs.readFileSync(m.mediaFile, "utf-8"), "media-bytes");
 });
@@ -180,4 +180,60 @@ test(".delay: one chat at a time with the configured pause between them", async 
   assert.ok(times[1] - times[0] >= 1900, `gap ${times[1] - times[0]}ms`);
   assert.ok(times[2] - times[1] >= 1900, `gap ${times[2] - times[1]}ms`);
   t.scheduler.stop();
+});
+
+test(".fetchgrup asks WhatsApp again and lists every group with its id", async () => {
+  const t = setup();
+  const list = await t.say(".fetchgrup");
+  assert.deepEqual(t.wa.groupCalls, [true], "refresh, not the cache");
+  assert.match(list, /Semua grup nomor ini\* \(2/);
+  assert.match(list, /g1\. Alumni A \(12 anggota\)\n\s+120363000000000001@g\.us/);
+  assert.match(list, /g2\. Komunitas B/);
+  assert.match(await t.say(".fetchgrup alumni"), /Alumni A/);
+  const quick = await t.say(".grup");
+  assert.equal(t.wa.groupCalls.at(-1), false);
+  assert.match(quick, /\.fetchgrup/);
+  assert.doesNotMatch(quick, /@g\.us/);
+});
+
+test("the forward keeps the channel details, like WhatsApp's own forward", async () => {
+  const t = setup();
+  const post = channelPost("Info terbaru");
+  post.extendedTextMessage.contextInfo.forwardedNewsletterMessageInfo.contentType = 1;
+  post.extendedTextMessage.contextInfo.forwardOrigin = 3;
+  await t.commands.handle({ text: "x", id: "M1", content: post });
+  await t.say(".set");
+  await t.say(".add 15m 08111111111");
+  await t.say(".kirim 15m");
+  const ctx = t.wa.relayed[0].content.extendedTextMessage.contextInfo;
+  assert.equal(ctx.isForwarded, true);
+  assert.equal(ctx.forwardOrigin, 3, "forwarded from a channel");
+  assert.deepEqual(
+    { ...ctx.forwardedNewsletterMessageInfo },
+    { newsletterJid: "120363999999999999@newsletter", serverMessageId: 42, newsletterName: "Saluran Toko", contentType: 1 }
+  );
+  assert.equal(ctx.quotedMessage, undefined);
+  t.scheduler.stop();
+});
+
+test(".set as a reply to a forwarded channel post uses the full copy (a reply's quote has no channel details)", async () => {
+  const t = setup();
+  await t.commands.handle({ text: "x", id: "POST1", content: channelPost("Promo") });
+  await t.commands.handle({ text: "x", id: "POST2", content: channelPost("Lain") });
+  const trimmed = { extendedTextMessage: { text: "Promo" } }; // what the quote carries
+  const reply = await t.say(".set", { quoted: { id: "POST1", content: trimmed } });
+  assert.match(reply, /Promo/);
+  assert.match(reply, /Saluran Toko/);
+  assert.equal(t.store.state.message.channel.jid, "120363999999999999@newsletter");
+});
+
+test("a channel post without a name gets it from the channel's metadata", async () => {
+  const t = setup();
+  const post = channelPost("Tanpa nama");
+  const info = post.extendedTextMessage.contextInfo.forwardedNewsletterMessageInfo;
+  info.newsletterJid = "120363888888888888@newsletter";
+  delete info.newsletterName;
+  await t.commands.handle({ text: "x", id: "M9", content: post });
+  assert.match(await t.say(".set"), /Saluran Dari Metadata/);
+  assert.equal(t.store.state.message.channel.name, "Saluran Dari Metadata");
 });

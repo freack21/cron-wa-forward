@@ -1,7 +1,8 @@
 # cron-wa-forward
 
 WhatsApp bot that forwards a post from your WhatsApp channel to chats and groups on a schedule
-(every 15 minutes, every hour, ...). Recipients see it as *forwarded from your channel*. You set
+(every 15 minutes, every hour, ...). Recipients see it the way WhatsApp shows a forwarded channel
+post: *forwarded from <your channel>* with the channel's name and a link to it. You set
 everything up by chatting with the bot's own number ("Message yourself"), no server access needed.
 
 > ⚠️ Uses the unofficial WhatsApp Web protocol ([whatsauto.js](https://github.com/freack21/whatsauto.js)
@@ -28,6 +29,7 @@ Or set `PAIRING_PHONE` in `.env` to log in with a pairing code. Run it with pm2 
 
    ```text
    .grup                          list groups: g1, g2, ...
+   .fetchgrup                     fetch every group of this number from WhatsApp again (with ids)
    .add 15m 08123456789, g2       every 15 minutes to a number and a group
    .add 1 jam g1 g3 https://chat.whatsapp.com/XXXX
    .del 15m 2                     remove chat #2 of the 15m schedule (numbers from .status)
