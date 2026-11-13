@@ -80,6 +80,9 @@ export class Commands {
       case "test":
       case "send":
         return this.sendNow(args);
+      case "delay":
+      case "jarak":
+        return this.delay(args);
       case "jeda":
       case "pause":
         this.store.state.paused = true;
@@ -112,6 +115,7 @@ export class Commands {
       "*.status* — pesan, jadwal, tujuan, waktu kirim berikutnya",
       "*.kirim 15m* — kirim sekarang untuk mencoba",
       "*.jeda* / *.lanjut* — hentikan / jalankan semua jadwal",
+      "*.delay 5-15* — jeda acak 5–15 detik antar chat (*.delay 10* = tepat 10 detik)",
       "",
       `Interval: 15m, 30m, 1h (jam), 1h30m, 1d (hari); boleh "15 menit", "2 jam". Minimal ${describe(`${this.opts.minIntervalMin}m`)}.`,
       "Tujuan: nomor (08…, +62…, 62…), g<nomor> dari .grup, link grup chat.whatsapp.com/…, atau ID …@g.us. Pisahkan dengan koma/spasi/baris baru.",
@@ -167,6 +171,7 @@ export class Commands {
         ? `📨 Pesan: _${m.preview}_${m.channel ? `\n   dari saluran ${m.channel.name ?? m.channel.jid}` : ""}`
         : "📨 Pesan: belum diatur — teruskan postingan saluran ke chat ini lalu ketik *.set*",
       this.store.state.paused ? "⏸️ *Dijeda* — ketik *.lanjut*" : "▶️ Berjalan",
+      `🐢 Jeda antar chat: ${this.delayText()} (ubah: *.delay 5-15*)`,
       "",
       this.schedulesText(names),
     ].join("\n");
@@ -307,6 +312,30 @@ export class Commands {
     ]
       .filter(Boolean)
       .join("\n");
+  }
+
+  private delayText() {
+    const [min, max] = this.scheduler.delayRange().map((ms) => Math.round(ms / 100) / 10);
+    return min === max ? `${min} detik` : `${min}–${max} detik (acak)`;
+  }
+
+  private delay(args: string) {
+    if (!args) return `🐢 Jeda antar chat sekarang: ${this.delayText()}.\nUbah: *.delay 5-15* (acak 5–15 detik) atau *.delay 10* (tepat 10 detik).`;
+    const m = /^(\d+(?:[.,]\d+)?)\s*(?:-|–|sampai|s\/d|to)?\s*(\d+(?:[.,]\d+)?)?\s*(?:s|d|dtk|detik)?$/i.exec(args.trim());
+    const num = (x?: string) => (x === undefined ? undefined : Number(x.replace(",", ".")));
+    const a = num(m?.[1]);
+    const b = num(m?.[2]) ?? a;
+    if (a === undefined || b === undefined || Number.isNaN(a) || Number.isNaN(b)) {
+      return "Format: *.delay 5-15* (acak 5–15 detik) atau *.delay 10* (tepat 10 detik).";
+    }
+    const [min, max] = [Math.min(a, b), Math.max(a, b)];
+    if (min < 2) return "❌ Jeda minimal 2 detik antar chat supaya tidak dianggap spam.";
+    if (max > 600) return "❌ Jeda maksimal 600 detik (10 menit).";
+    this.store.state.delaySec = [min, max];
+    this.store.save();
+    const chats = Math.max(0, ...Object.values(this.store.config.schedules).map((l) => l.length));
+    const longest = chats > 1 ? `\nJadwal terbesar (${chats} chat) selesai dalam ±${Math.ceil(((chats - 1) * max) / 60)} menit.` : "";
+    return `✅ Jeda antar chat: ${this.delayText()}. Pesan dikirim satu per satu.${longest}`;
   }
 
   private async loadGroups() {

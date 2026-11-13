@@ -53,6 +53,13 @@ export class Scheduler {
     this.refresh();
   }
 
+  /** The pause between two chats, in ms, as [min, max] (set with `.delay`, else the env default). */
+  delayRange(): [number, number] {
+    const custom = this.store.state.delaySec;
+    if (custom) return [custom[0] * 1000, custom[1] * 1000];
+    return [this.opts.gapMs, this.opts.gapMs + this.opts.gapJitterMs];
+  }
+
   nextRunOf(key: string) {
     return this.next.get(key);
   }
@@ -92,7 +99,11 @@ export class Scheduler {
       await this.refreshMedia().catch((error) => this.log(`[media] re-upload failed: ${error?.message ?? error}`));
       const content = forwardContent(this.store.state.message!.content, message.channel);
       for (const [i, jid] of chats.entries()) {
-        if (i > 0) await sleep(this.opts.gapMs + Math.floor(Math.random() * (this.opts.gapJitterMs + 1)));
+        // one chat at a time, with a random pause in between: never all at once
+        if (i > 0) {
+          const [min, max] = this.delayRange();
+          await sleep(min + Math.floor(Math.random() * (max - min + 1)));
+        }
         try {
           await this.wa.relay(jid, content);
           result.sent.push(jid);

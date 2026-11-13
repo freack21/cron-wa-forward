@@ -37,6 +37,10 @@ Or set `PAIRING_PHONE` in `.env` to log in with a pairing code. Run it with pm2 
 3. **Check:** `.status` (message, schedules, chats, next run), `.kirim 15m` (send now),
    `.jeda` / `.lanjut` (pause / resume), `.menu` (help).
 
+Chats of a schedule are sent **one at a time** with a random pause in between (default 5–10 s).
+Change it with `.delay 5-15` (random 5–15 s) or `.delay 10` (exactly 10 s); 2–600 s. Schedules
+that are due at the same time wait for each other.
+
 Intervals: `15m`, `30m`, `1h`, `1h30m`, `1d`, also typed as `15 menit`, `2 jam`, `1 hari`; minimum
 5 minutes. Runs follow the clock in `TZ` (`15m` = :00, :15, :30, :45; `1d` = midnight). Chats:
 numbers in any common shape (`08…`, `+62 812 …`, `62…`), `g<n>` from `.grup`, group invite links,

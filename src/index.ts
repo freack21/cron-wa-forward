@@ -40,8 +40,8 @@ const store = new Store(dataDir);
 const ownMessageIds = new Set<string>();
 const wa = createWa(client, ownMessageIds);
 const scheduler = new Scheduler(store, wa, {
-  gapMs: num("FORWARD_GAP_MS", 3000),
-  gapJitterMs: num("FORWARD_GAP_JITTER_MS", 3000),
+  gapMs: num("FORWARD_GAP_MS", 5000),
+  gapJitterMs: num("FORWARD_GAP_JITTER_MS", 5000),
   tzOffsetMin: tzOffset(timeZone),
   mediaMaxAgeMs: num("MEDIA_REFRESH_DAYS", 7) * 86_400_000,
 });

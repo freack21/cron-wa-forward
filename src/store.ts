@@ -28,6 +28,8 @@ export interface StoredMessage {
 
 export interface State {
   paused: boolean;
+  /** Pause between two chats of one run, in seconds: random in [min, max]. Unset: the env default. */
+  delaySec?: [number, number];
   message?: StoredMessage;
   lastRun: Record<string, number>;
 }

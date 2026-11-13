@@ -154,3 +154,30 @@ test("the timer fires a run on schedule", async (ctx) => {
   assert.equal(t.wa.relayed.length, 1);
   t.scheduler.stop();
 });
+
+test(".delay: one chat at a time with the configured pause between them", async () => {
+  const t = setup();
+  assert.match(await t.say(".delay"), /Jeda antar chat sekarang: 0 detik/);
+  assert.match(await t.say(".delay 1"), /minimal 2 detik/);
+  assert.match(await t.say(".delay 700"), /maksimal 600/);
+  assert.match(await t.say(".delay abc"), /Format/);
+  assert.match(await t.say(".delay 15-5"), /5–15 detik \(acak\)/);
+  assert.deepEqual(t.store.state.delaySec, [5, 15]);
+  assert.match(await t.say(".delay 2 detik"), /2 detik\./);
+  assert.match(await t.say(".status"), /Jeda antar chat: 2 detik/);
+
+  await t.commands.handle({ text: "x", id: "M1", content: channelPost() });
+  await t.say(".set");
+  await t.say(".add 15m 08111111111, 08222222222, 08333333333");
+  const times = [];
+  const relay = t.wa.relay.bind(t.wa);
+  t.wa.relay = async (jid, content) => {
+    times.push(Date.now());
+    return relay(jid, content);
+  };
+  await t.say(".kirim 15m");
+  assert.equal(times.length, 3);
+  assert.ok(times[1] - times[0] >= 1900, `gap ${times[1] - times[0]}ms`);
+  assert.ok(times[2] - times[1] >= 1900, `gap ${times[2] - times[1]}ms`);
+  t.scheduler.stop();
+});
